@@ -366,7 +366,7 @@ fn expand_no_cow(
         }
         #[automatically_derived]
         impl ::core::cmp::PartialEq<#enum_name> for #name{
-            fn eq(&self, other: &TestEnumKeys) -> bool {
+            fn eq(&self, other: &#enum_name) -> bool {
                  match (self, other) {
                     #(#partial_eq_lines),*
                     ,
