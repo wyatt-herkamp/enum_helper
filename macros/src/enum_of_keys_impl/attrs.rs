@@ -1,12 +1,7 @@
-use proc_macro2::Ident;
 use quote::{quote, ToTokens, TokenStreamExt};
-use std::f32::consts::E;
-use std::fmt::{Debug, Formatter};
-use syn::__private::parse_punct;
-use syn::parse::discouraged::AnyDelimiter;
-use syn::parse::{Parse, ParseStream, Parser};
-use syn::token::{Bracket, Paren};
-use syn::{Attribute, Path, Token};
+use std::fmt::{Debug};
+use syn::parse::{Parse, ParseStream};
+use syn::{ Path, Token};
 
 mod keywords {
     use syn::custom_keyword;
@@ -55,6 +50,7 @@ impl Parse for EnumOfKeysAttribute {
 pub struct InnerAttribute {
     pub meta: syn::Meta,
 }
+
 impl Parse for InnerAttribute {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let meta = input.parse::<syn::Meta>()?;

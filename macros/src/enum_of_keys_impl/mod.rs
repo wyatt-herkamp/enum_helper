@@ -3,10 +3,8 @@ mod attrs;
 use crate::enum_of_keys_impl::attrs::{EnumOfKeysAttribute, InnerAttribute, VariantAttribute};
 use proc_macro2::{Ident, TokenStream};
 use quote::{quote, ToTokens, TokenStreamExt};
-use std::env::var;
-use syn::parse::Parse;
 use syn::spanned::Spanned;
-use syn::{Attribute, Fields, Meta, Path, Result};
+use syn::{Attribute, Fields, Path, Result};
 use syn::{DeriveInput, Error};
 
 #[derive(Debug)]
@@ -275,7 +273,6 @@ fn expand_cow(
         } else {
             to_owned_catches.push(quote! {
                 #enum_name::#variant_name => #enum_name::#variant_name
-
             })
         }
     }
