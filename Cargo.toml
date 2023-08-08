@@ -1,0 +1,16 @@
+[package]
+name = "enum_helper"
+version = "0.0.0"
+authors = ["Wyatt Herkamp <wherkamp@gmail.com>"]
+description = "A `cargo generate` template for quick-starting a procedural macro crate"
+keywords = ["template", "proc_macro", "procmacro"]
+edition = "2018"
+
+
+[dependencies]
+enum_helpers_macros = { path = "macros", optional = true }
+[dev-dependencies]
+strum = { version = "0.25",features = ["derive"] }
+[features]
+default = ["derive"]
+derive = ["enum_helpers_macros"]
