@@ -9,7 +9,6 @@ edition = "2021"
 
 [dependencies]
 enum_helpers_macros = { path = "macros", optional = true }
-
 [dev-dependencies]
 strum = { version = "0.25",features = ["derive"] }
 [features]

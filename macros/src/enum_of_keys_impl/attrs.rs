@@ -1,7 +1,8 @@
-use quote::{quote, ToTokens, TokenStreamExt};
-use std::fmt::{Debug};
+use proc_macro2::{Ident, TokenStream};
+use quote::{quote, ToTokens, TokenStreamExt, format_ident};
+use std::fmt::Debug;
 use syn::parse::{Parse, ParseStream};
-use syn::{ Path, Token};
+use syn::{Path, Token};
 
 mod keywords {
     use syn::custom_keyword;
@@ -68,21 +69,38 @@ impl ToTokens for InnerAttribute {
 }
 
 #[derive(Debug)]
+pub struct DefaultValue {
+    pub key_name: Ident,
+    pub unwrap_variant: Option<TokenStream>,
+}
+#[derive(Debug)]
 pub struct VariantAttribute {
-    pub default: bool,
+    pub default: Option<DefaultValue>,
 }
 
 impl Parse for VariantAttribute {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let mut default = false;
+        let mut default: Option<DefaultValue> = None;
         // Loop through tokens seperated by ,
 
         while !input.is_empty() {
             let peak = input.lookahead1();
             if peak.peek(keywords::default) {
                 input.parse::<keywords::default>()?;
+                if input.peek(Token![=]) {
+                    input.parse::<Token![=]>()?;
+                    let key_name = input.parse::<syn::Ident>()?;
+                    default = Some(DefaultValue {
+                        key_name,
+                        unwrap_variant: None,
+                    });
+                }else{
+                    default = Some(DefaultValue {
+                        key_name: format_ident!("value"),
+                        unwrap_variant: None,
+                    });
+                }
                 input.parse::<Option<Token![,]>>()?;
-                default = true
             } else {
                 return Err(peak.error());
             }

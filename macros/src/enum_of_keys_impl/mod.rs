@@ -1,172 +1,13 @@
 mod attrs;
+mod variant;
 
-use crate::enum_of_keys_impl::attrs::{EnumOfKeysAttribute, InnerAttribute, VariantAttribute};
+use crate::enum_of_keys_impl::attrs::{EnumOfKeysAttribute, InnerAttribute};
+use crate::enum_of_keys_impl::variant::Variant;
 use proc_macro2::{Ident, TokenStream};
-use quote::{quote, ToTokens, TokenStreamExt};
-use syn::spanned::Spanned;
-use syn::{Attribute, Fields, Path, Result};
+use quote::{quote, TokenStreamExt};
+use syn::{Attribute, Path, Result};
 use syn::{DeriveInput, Error};
 
-#[derive(Debug)]
-pub struct Variant {
-    pub name: Ident,
-    pub enum_of_keys_attr: Option<VariantAttribute>,
-    pub inner_attrs: Vec<InnerAttribute>,
-    pub default_in_cow: bool,
-    pub fields_collection: TokenStream,
-}
-impl Variant {
-    pub fn new(variant: syn::Variant, default_in_cow: bool) -> Result<Self> {
-        let attributes: Option<VariantAttribute> = variant
-            .attrs
-            .iter()
-            .find(|attr| attr.path().is_ident("enum_of_keys"))
-            .map(|v| v.parse_args())
-            .transpose()?;
-        let inner_attrs = find_and_parse_inner_attrs(&variant.attrs)?;
-        if attributes.as_ref().map(|v| v.default).unwrap_or(false) {
-            if let Fields::Unnamed(value) = &variant.fields {
-                if value.unnamed.len() != 1 {
-                    return Err(Error::new(
-                        variant.span(),
-                        "The default can only be a single value Tuple Variant",
-                    ));
-                }
-            } else {
-                return Err(Error::new(
-                    variant.span(),
-                    "The default can only be a single value Tuple Variant",
-                ));
-            }
-        }
-        let fields_collection = match variant.fields {
-            Fields::Named(_) => {
-                quote! {
-                    { .. }
-                }
-            }
-            Fields::Unnamed(_) => {
-                quote! {
-                    (..)
-                }
-            }
-            Fields::Unit => {
-                quote! {}
-            }
-        };
-
-        Ok(Variant {
-            name: variant.ident,
-            enum_of_keys_attr: attributes,
-            inner_attrs,
-            default_in_cow,
-            fields_collection,
-        })
-    }
-
-    pub fn create_get_key_line_owned(&self, enum_name: Ident, key_enum_name: Path) -> TokenStream {
-        let Self {
-            name,
-            fields_collection,
-            enum_of_keys_attr,
-            ..
-        } = self;
-        if enum_of_keys_attr
-            .as_ref()
-            .map(|v| v.default)
-            .unwrap_or(false)
-        {
-            quote! {
-                #enum_name::#name(value) => #key_enum_name::#name(::std::borrow::Cow::Owned(value.clone()))
-            }
-        } else {
-            quote! {
-                #enum_name::#name #fields_collection => #key_enum_name::#name
-            }
-        }
-    }
-    pub fn create_get_key_line(&self, enum_name: Ident, key_enum_name: Path) -> TokenStream {
-        let Self {
-            name,
-            fields_collection,
-            enum_of_keys_attr,
-            ..
-        } = self;
-        if enum_of_keys_attr
-            .as_ref()
-            .map(|v| v.default)
-            .unwrap_or(false)
-        {
-            if self.default_in_cow {
-                quote! {
-                    #enum_name::#name(value) => #key_enum_name::#name(::std::borrow::Cow::Borrowed(value))
-                }
-            } else {
-                quote! {
-                    #enum_name::#name(value) => #key_enum_name::#name(value.clone())
-                }
-            }
-        } else {
-            quote! {
-                #enum_name::#name #fields_collection => #key_enum_name::#name
-            }
-        }
-    }
-
-    pub fn create_partial_eq_line(&self, enum_name: Ident, key_enum_name: Path) -> TokenStream {
-        let Self {
-            name,
-            enum_of_keys_attr,
-            fields_collection,
-            ..
-        } = self;
-        if enum_of_keys_attr
-            .as_ref()
-            .map(|v| v.default)
-            .unwrap_or(false)
-        {
-            quote! {
-                (#enum_name::#name(a), #key_enum_name::#name(b)) => a == b
-            }
-        } else {
-            quote! {
-                (#enum_name::#name #fields_collection, #key_enum_name::#name) => true
-            }
-        }
-    }
-}
-impl ToTokens for Variant {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        let Variant {
-            name,
-            inner_attrs,
-            enum_of_keys_attr,
-            ..
-        } = self;
-        if let Some(value) = enum_of_keys_attr.as_ref() {
-            if value.default {
-                let value = if self.default_in_cow {
-                    quote! {
-                        #(#inner_attrs)*
-                        #name(::std::borrow::Cow<'a, str>)
-                    }
-                } else {
-                    quote! {
-                         #(#inner_attrs)*
-                         #name(String)
-                    }
-                };
-                tokens.append_all(value);
-                return;
-            }
-        }
-        let value = quote! {
-            #(#inner_attrs)*
-            #name
-        };
-        tokens.append_all(value);
-    }
-}
 pub fn find_and_parse_inner_attrs(attrs: &Vec<Attribute>) -> Result<Vec<InnerAttribute>> {
     let mut result = Vec::new();
 
@@ -206,18 +47,16 @@ pub(crate) fn expand(derive_input: DeriveInput) -> Result<TokenStream> {
         }
     };
     let mut variants = Vec::with_capacity(data_enum.variants.len());
-    let mut partial_eq_lines = Vec::with_capacity(data_enum.variants.len());
     let mut get_key_lines = Vec::with_capacity(data_enum.variants.len());
     let mut get_key_lines_owned = Vec::with_capacity(data_enum.variants.len());
 
     for variant in data_enum.variants {
         let variant = Variant::new(variant, enum_attributes.store_default_in_cow)?;
-        partial_eq_lines
-            .push(variant.create_partial_eq_line(name.clone(), enum_attributes.name.clone()));
-        get_key_lines.push(variant.create_get_key_line(name.clone(), enum_attributes.name.clone()));
+
+        get_key_lines.push(variant.create_get_key_line(&name, &enum_attributes.name));
         if enum_attributes.store_default_in_cow {
             get_key_lines_owned
-                .push(variant.create_get_key_line_owned(name.clone(), enum_attributes.name.clone()))
+                .push(variant.create_get_key_line_owned(&name, &enum_attributes.name))
         }
         variants.push(variant);
     }
@@ -229,43 +68,76 @@ pub(crate) fn expand(derive_input: DeriveInput) -> Result<TokenStream> {
     let result = if store_default_in_cow {
         expand_cow(
             name,
-            &mut inner_attrs,
-            &mut variants,
-            &mut partial_eq_lines,
-            &mut get_key_lines,
+            inner_attrs,
+            variants,
+            get_key_lines,
             enum_name,
-            &mut get_key_lines_owned,
+            get_key_lines_owned,
         )?
     } else {
-        expand_no_cow(
-            name,
-            &mut inner_attrs,
-            &mut variants,
-            &mut partial_eq_lines,
-            &mut get_key_lines,
-            enum_name,
-        )
+        expand_no_cow(name, inner_attrs, variants, get_key_lines, enum_name)
     };
 
     Ok(result)
 }
+fn expand_inner(
+    enum_name: TokenStream,
+    og_enum: &Ident,
+    partial_eq_lines: Vec<TokenStream>,
+) -> TokenStream {
+    quote! {
+        #[automatically_derived]
+        impl enum_helper::KeyEnum for #enum_name{ }
+        #[automatically_derived]
+        impl ::core::cmp::PartialEq<#enum_name> for #og_enum{
+            fn eq(&self, other: &#enum_name) -> bool {
+                 match (self, other) {
+                    #(#partial_eq_lines),*
+                    ,
+                    _ => false
+                 }
+            }
+        }
+        #[automatically_derived]
+        impl ::core::cmp::PartialEq<#enum_name> for &'_ #og_enum{
+            fn eq(&self, other: &#enum_name) -> bool {
+                 match (self, other) {
+                    #(#partial_eq_lines),*
+                    ,
+                    _ => false
+                 }
+            }
+        }
 
+        #[automatically_derived]
+        impl ::core::cmp::PartialEq<#og_enum> for #enum_name{
+            fn eq(&self, other: &#og_enum) -> bool {
+                 match ( other,self) {
+                    #(#partial_eq_lines),*
+                    ,
+                    _ => false
+                 }
+            }
+        }
+
+    }
+}
 fn expand_cow(
     name: Ident,
-    inner_attrs: &mut Vec<InnerAttribute>,
-    variants: &mut Vec<Variant>,
-    partial_eq_lines: &mut Vec<TokenStream>,
-    get_key_lines: &mut Vec<TokenStream>,
+    inner_attrs: Vec<InnerAttribute>,
+    variants: Vec<Variant>,
+    get_key_lines: Vec<TokenStream>,
     enum_name: Path,
-    get_key_owned_lines: &mut Vec<TokenStream>,
+    get_key_owned_lines: Vec<TokenStream>,
 ) -> Result<TokenStream> {
     let mut to_owned_catches = Vec::new();
     for variant in variants.iter() {
         let variant_name = &variant.name;
         if variant
-            .enum_of_keys_attr.as_ref()
-            .map(|v| v.default)
-            .unwrap_or_default()
+            .enum_of_keys_attr
+            .as_ref()
+            .and_then(|v| v.default.as_ref())
+            .is_some()
         {
             to_owned_catches.push(quote! {
                 #enum_name::#variant_name(v) => #enum_name::#variant_name(::std::borrow::Cow::Owned(v.as_ref().to_owned()))
@@ -276,16 +148,18 @@ fn expand_cow(
             })
         }
     }
-    let result = quote! {
+    let mut result = quote! {
         #[automatically_derived]
         #(#inner_attrs)*
         pub enum #enum_name<'a>{
             #(#variants),*
         }
-        #[automatically_derived]
-       impl enum_helper::KeyEnum for #enum_name<'_>{ }
+
         #[automatically_derived]
         impl #enum_name<'_> {
+            /// Creates a new copy of the Enum.
+            ///
+            /// For the Default variant it will create a new owned copy of the default value.
             pub fn to_owned(&self) -> #enum_name<'static>{
                 match self{
                     #(#to_owned_catches),*
@@ -300,52 +174,35 @@ fn expand_cow(
                     #(#get_key_owned_lines),*
                 }
             }
-             fn get_key_borrowed(&self) -> Self::KeyEnum<'_>{
-                 match self{
+            fn get_key_borrowed(&self) -> Self::KeyEnum<'_>{
+                match self{
                     #(#get_key_lines),*
                 }
-             }
-        }
-        #[automatically_derived]
-        impl ::core::cmp::PartialEq<#enum_name<'_>> for #name{
-            fn eq(&self, other: &#enum_name<'_>) -> bool {
-                 match (self, other) {
-                    #(#partial_eq_lines),*
-                    ,
-                    _ => false
-                 }
-            }
-        }
-        #[automatically_derived]
-        impl ::core::cmp::PartialEq<#name> for #enum_name<'_>{
-            fn eq(&self, other: &#name) -> bool {
-                 match ( other,self) {
-                    #(#partial_eq_lines),*
-                    ,
-                    _ => false
-                 }
             }
         }
     };
+    result.append_all(expand_inner(
+        quote! { #enum_name<'_> },
+        &name,
+        variants
+            .iter()
+            .map(|v| v.create_partial_eq_line(&name, &enum_name))
+            .collect::<Vec<_>>(),
+    ));
     Ok(result)
 }
 fn expand_no_cow(
     name: Ident,
-    inner_attrs: &mut Vec<InnerAttribute>,
-    variants: &mut Vec<Variant>,
-    partial_eq_lines: &mut Vec<TokenStream>,
-    get_key_lines: &mut Vec<TokenStream>,
+    inner_attrs: Vec<InnerAttribute>,
+    variants: Vec<Variant>,
+    get_key_lines: Vec<TokenStream>,
     enum_name: Path,
 ) -> TokenStream {
-    quote! {
+    let mut result = quote! {
         #[automatically_derived]
         #(#inner_attrs)*
         pub enum #enum_name{
             #(#variants),*
-        }
-        #[automatically_derived]
-        impl enum_helper::KeyEnum for #enum_name{
-
         }
         #[automatically_derived]
         impl enum_helper::HasKeyEnum for #name{
@@ -361,25 +218,14 @@ fn expand_no_cow(
                 }
              }
         }
-        #[automatically_derived]
-        impl ::core::cmp::PartialEq<#enum_name> for #name{
-            fn eq(&self, other: &#enum_name) -> bool {
-                 match (self, other) {
-                    #(#partial_eq_lines),*
-                    ,
-                    _ => false
-                 }
-            }
-        }
-        #[automatically_derived]
-        impl ::core::cmp::PartialEq<#name> for #enum_name{
-            fn eq(&self, other: &#name) -> bool {
-                 match ( other,self) {
-                    #(#partial_eq_lines),*
-                    ,
-                    _ => false
-                 }
-            }
-        }
-    }
+    };
+    result.append_all(expand_inner(
+        quote! { #enum_name },
+        &name,
+        variants
+            .iter()
+            .map(|v| v.create_partial_eq_line(&name, &enum_name))
+            .collect::<Vec<_>>(),
+    ));
+    result
 }
