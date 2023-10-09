@@ -58,19 +58,63 @@ pub(crate) fn expand(derive_input: DeriveInput) -> Result<TokenStream> {
     let EnumOfKeysAttribute {
         name: enum_name,
         store_default_in_cow,
+        impl_common_traits,
+        serde,
+        impl_strum,
     } = enum_attributes;
-    let result = if store_default_in_cow {
+    let mut extras =
+        Vec::with_capacity(impl_common_traits as usize + impl_strum as usize + inner_attrs.len());
+    if impl_common_traits {
+        let has_default = variants.iter().any(|v| v.has_default());
+        if has_default {
+            extras.push(InnerAttribute {
+                meta: syn::parse_quote! {
+                    derive(Clone, Debug, PartialEq, Eq)
+                },
+            })
+        } else {
+            extras.push(InnerAttribute {
+                meta: syn::parse_quote! {
+                    derive(Clone, Copy, Debug, PartialEq, Eq)
+                },
+            })
+        }
+    }
+    if impl_strum {
+        extras.push(InnerAttribute {
+            meta: syn::parse_quote! {
+                derive(strum::AsRefStr, strum::EnumIs, strum::EnumString, strum::Display, strum::EnumIter)
+            },
+        })
+    }
+    let inner_attrs = if extras.is_empty() {
+        inner_attrs
+    } else {
+        extras.extend(inner_attrs);
+        extras
+    };
+    let mut result = if store_default_in_cow {
         expand_cow(
             name,
             inner_attrs,
             variants,
             get_key_lines,
-            enum_name,
+            enum_name.clone(),
             get_key_lines_owned,
         )?
     } else {
-        expand_no_cow(name, inner_attrs, variants, get_key_lines, enum_name)
+        expand_no_cow(
+            name,
+            inner_attrs,
+            variants,
+            get_key_lines,
+            enum_name.clone(),
+        )
     };
+    if let Some(serde) = serde {
+        result.append_all(crate::simple_serde::expand_inner_deserialize(&serde, &enum_name));
+        result.append_all(crate::simple_serde::expand_inner_serialize(&serde, &enum_name));
+    }
 
     Ok(result)
 }

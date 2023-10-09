@@ -83,7 +83,12 @@ impl Variant {
             fields_collection,
         })
     }
-
+    pub fn has_default(&self) -> bool {
+        self.enum_of_keys_attr
+            .as_ref()
+            .and_then(|v| v.default.as_ref())
+            .is_some()
+    }
     pub fn create_get_key_line_owned(
         &self,
         enum_name: &Ident,

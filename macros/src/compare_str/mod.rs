@@ -1,4 +1,4 @@
-use crate::utils::into_enum;
+use crate::utils::{consume_comma, into_enum};
 use proc_macro2::{Ident, TokenStream};
 use quote::{quote, ToTokens, TokenStreamExt};
 use syn::parse::Parse;
@@ -32,42 +32,36 @@ impl Default for TypeAttribute {
 }
 impl Parse for TypeAttribute {
     fn parse(input: syn::parse::ParseStream) -> Result<Self> {
-        let mut include_variant = false;
-        let mut partial_eq = true;
-        let mut to_lowercase = false;
+        let mut type_attribute = Self::default();
         while !input.is_empty() {
             let peek = input.lookahead1();
             if peek.peek(keywords::include_variant) {
                 input.parse::<keywords::include_variant>()?;
                 if input.parse::<Token![=]>().is_ok() {
-                    include_variant = input.parse::<syn::LitBool>()?.value();
+                    type_attribute.include_variant = input.parse::<syn::LitBool>()?.value();
                 } else {
-                    include_variant = true;
+                    type_attribute.include_variant = true;
                 }
             } else if peek.peek(keywords::to_lowercase) {
                 input.parse::<keywords::to_lowercase>()?;
                 if input.parse::<Token![=]>().is_ok() {
-                    to_lowercase = input.parse::<syn::LitBool>()?.value();
+                    type_attribute.to_lowercase = input.parse::<syn::LitBool>()?.value();
                 } else {
-                    to_lowercase = true;
+                    type_attribute.to_lowercase = true;
                 }
             } else if peek.peek(keywords::partial_eq) {
                 input.parse::<keywords::partial_eq>()?;
                 if input.parse::<Token![=]>().is_ok() {
-                    partial_eq = input.parse::<syn::LitBool>()?.value();
+                    type_attribute.partial_eq = input.parse::<syn::LitBool>()?.value();
                 } else {
-                    partial_eq = true;
+                    type_attribute.partial_eq = true;
                 }
             } else {
                 return Err(peek.error());
             }
             let _ = input.parse::<Token![,]>();
         }
-        Ok(Self {
-            include_variant,
-            partial_eq,
-            to_lowercase,
-        })
+        Ok(type_attribute)
     }
 }
 /// This attribute is used to generate an compare to str
@@ -101,7 +95,7 @@ impl Parse for CompareToStrAttribute {
             } else {
                 return Err(peek.error());
             }
-            let _ = input.parse::<Token![,]>();
+            consume_comma!(input);
         }
         Ok(Self { equals, contains })
     }
@@ -113,7 +107,7 @@ pub struct CompareToStrVariant {
     pub attributes: CompareToStrAttribute,
 }
 impl TryFrom<Variant> for CompareToStrVariant {
-    type Error = syn::Error;
+    type Error = Error;
 
     fn try_from(value: Variant) -> std::result::Result<Self, Self::Error> {
         let mut compare_attr = CompareToStrAttribute::default();
@@ -210,11 +204,12 @@ pub(crate) fn expand(derive_input: DeriveInput) -> Result<TokenStream> {
     } else {
         quote! {}
     };
-    // TODO Improve Doc Comment
+    // TODO Improve Doc Comment to show what it is checking for
     let mut result = quote! {
         impl #ident{
             #[doc="Compares an enum variant to a str"]
-            fn equals_str(&self, other: impl core::convert::AsRef<str>) -> bool {
+            #[automatically_derived]
+            pub fn equals_str(&self, other: impl core::convert::AsRef<str>) -> bool {
                 let other = other.as_ref();
                 #to_lower_case
                     match self {
@@ -225,6 +220,7 @@ pub(crate) fn expand(derive_input: DeriveInput) -> Result<TokenStream> {
     };
     if type_attr.partial_eq {
         let impl_trait = quote! {
+            #[automatically_derived]
             impl core::cmp::PartialEq<str> for #ident {
                 fn eq(&self, other: &str) -> bool {
                    #to_lower_case
@@ -233,6 +229,7 @@ pub(crate) fn expand(derive_input: DeriveInput) -> Result<TokenStream> {
                     }
                 }
             }
+            #[automatically_derived]
             impl core::cmp::PartialEq<&str> for #ident {
                 fn eq(&self, other: &&str) -> bool {
                         let other = *other;

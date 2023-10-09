@@ -1,40 +1,89 @@
+use crate::utils::consume_comma;
+use crate::simple_serde::SerdeSettings;
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote, ToTokens, TokenStreamExt};
 use std::fmt::Debug;
 use syn::parse::{Parse, ParseStream};
-use syn::{Path, Token};
+use syn::{parenthesized, Path, Token};
 
 mod keywords {
     use syn::custom_keyword;
     custom_keyword!(default);
     custom_keyword!(default_in_cow);
+    custom_keyword!(impl_common_traits);
+    custom_keyword!(serde);
+    custom_keyword!(impl_strum);
 }
 
 /// This attribute is used to generate an enum of keys for a struct.
-/// #[enum_of_keys(KeyEnumName, derive(...))]
+/// #[enum_of_keys(KeyEnumName)]
 #[derive(Debug)]
 pub struct EnumOfKeysAttribute {
+    /// Required - The name of the KeyEnum
+    /// #[enum_of_keys(KeyEnumName)]
     pub name: Path,
+    /// Store the default variant in a Cow
+    /// #[enum_of_keys(KeyEnumName, default_in_cow)]
     pub store_default_in_cow: bool,
+    /// Implement common traits for the enum of keys such as
+    /// Add derive(Clone, Copy, Debug, PartialEq, Eq) to the enum of keys
+    pub impl_common_traits: bool,
+    /// Implements serde::Serialize and serde::Deserialize for the enum of keys
+    /// Requires std::fmt::Display and std::str::FromStr to be implemented for the enum of keys
+    /// You can use the strum crate to implement these traits easily
+    pub serde: Option<SerdeSettings>,
+    /// Add derive(strum::EnumIter, strum::EnumString, strum::Display, strum::EnumIs, strum::AsRefStr)
+    /// to the enum of keys
+    pub impl_strum: bool,
 }
 
 impl Parse for EnumOfKeysAttribute {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let name = input.parse()?;
         let mut default_in_cow = false;
-        if input.parse::<Token![,]>().is_ok() {
+        let mut impl_common_traits = false;
+        let mut serde = None;
+        let mut impl_strum = false;
+        consume_comma!(input);
+
+        while !input.is_empty() {
             let lookahead1 = input.lookahead1();
             if lookahead1.peek(keywords::default_in_cow) {
                 input.parse::<keywords::default_in_cow>()?;
                 default_in_cow = true;
+            } else if lookahead1.peek(keywords::impl_common_traits) {
+                input.parse::<keywords::impl_common_traits>()?;
+                impl_common_traits = true;
+            } else if lookahead1.peek(keywords::serde) {
+                input.parse::<keywords::serde>()?;
+                if input.peek(Token![,]) {
+                    input.parse::<Token![,]>()?;
+                    serde = Some(SerdeSettings::default());
+                    continue;
+                } else {
+                    let content;
+                    parenthesized!(content in input);
+                    serde = Some(content.parse::<SerdeSettings>()?);
+                }
+            } else if lookahead1.peek(keywords::impl_strum) {
+                input.parse::<keywords::impl_strum>()?;
+                impl_strum = true;
             } else {
                 return Err(lookahead1.error());
             }
+            consume_comma!(input);
         }
-
+        if impl_strum {
+            if let Some(serde_settings) = serde.as_mut() {
+                serde_settings.has_as_ref_str = true;
+            }
+        }
         Ok(EnumOfKeysAttribute {
             name,
             store_default_in_cow: default_in_cow,
+            impl_common_traits,
+            serde,
+            impl_strum,
         })
     }
 }

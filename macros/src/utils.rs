@@ -12,3 +12,12 @@ macro_rules! into_enum {
     };
 }
 pub(crate) use into_enum;
+
+macro_rules! consume_comma {
+    (
+        $input:ident
+    ) => {
+        let _ = $input.parse::<syn::Token![,]>();
+    };
+}
+pub(crate) use consume_comma;

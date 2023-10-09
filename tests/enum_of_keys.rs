@@ -1,18 +1,9 @@
 use enum_helper::LookupByKey;
-use enum_helpers_macros::{EnumOfKeys};
+use enum_helpers_macros::EnumOfKeys;
 use strum::EnumIter;
 use strum::IntoEnumIterator;
 #[derive(EnumOfKeys, EnumIter, Debug)]
-#[enum_of_keys(TestEnumKeys)]
-#[enum_attr(derive(
-    Debug,
-    Clone,
-    PartialEq,
-    Eq,
-    strum::Display,
-    strum::EnumString,
-    strum::EnumIter
-))]
+#[enum_of_keys(TestEnumKeys, impl_common_traits, serde, impl_strum)]
 #[enum_attr(strum(serialize_all = "UPPERCASE"))]
 #[non_exhaustive]
 pub enum TestEnum {

@@ -31,7 +31,7 @@ pub enum OtherTypes {
 }
 #[derive(Debug, Clone, PartialEq, Eq, CompareToStr)]
 #[compare_str(partial_eq = false, to_lowercase)]
-pub enum OtherTypesNoPartialEq{
+pub enum OtherTypesNoPartialEq {
     #[compare_str(equals["uuid::Uuid", "Uuid"])]
     UUID {
         format: UUIDFormat,
