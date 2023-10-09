@@ -23,7 +23,7 @@ impl Variant {
             .map(|v| v.parse_args())
             .transpose()?;
         let inner_attrs = find_and_parse_inner_attrs(&variant.attrs)?;
-        if let Some( default_value) = attributes.as_mut().and_then(|v| v.default.as_mut()) {
+        if let Some(default_value) = attributes.as_mut().and_then(|v| v.default.as_mut()) {
             match &variant.fields {
                 Fields::Named(named) => {
                     if named.named.len() == 1 {
@@ -44,8 +44,7 @@ impl Variant {
                         default_value.unwrap_variant = Some(quote!(
                             (#default_value_ident, ..)
                         ))
-                    }else{
-
+                    } else {
                         let default_value_ident = &default_value.key_name.clone();
                         default_value.unwrap_variant = Some(quote!(
                             (#default_value_ident)

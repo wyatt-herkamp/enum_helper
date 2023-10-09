@@ -1,5 +1,5 @@
 use enum_helper::LookupByKey;
-use enum_helpers_macros::EnumOfKeys;
+use enum_helpers_macros::{EnumOfKeys};
 use strum::EnumIter;
 use strum::IntoEnumIterator;
 #[derive(EnumOfKeys, EnumIter, Debug)]

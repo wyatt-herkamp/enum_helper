@@ -1,4 +1,6 @@
+mod compare_str;
 mod enum_of_keys_impl;
+pub(crate) mod utils;
 
 use proc_macro::TokenStream;
 
@@ -60,5 +62,14 @@ pub fn enum_of_keys(input: TokenStream) -> TokenStream {
         syn::Error::new_spanned(input, "EnumOfKeys can only be derived for enums")
             .to_compile_error()
             .into()
+    }
+}
+
+#[proc_macro_derive(CompareToStr, attributes(compare_str))]
+pub fn compare_to_str(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    match compare_str::expand(input) {
+        Ok(ok) => ok.into(),
+        Err(err) => err.to_compile_error().into(),
     }
 }

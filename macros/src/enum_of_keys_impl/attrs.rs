@@ -1,5 +1,5 @@
 use proc_macro2::{Ident, TokenStream};
-use quote::{quote, ToTokens, TokenStreamExt, format_ident};
+use quote::{format_ident, quote, ToTokens, TokenStreamExt};
 use std::fmt::Debug;
 use syn::parse::{Parse, ParseStream};
 use syn::{Path, Token};
@@ -94,7 +94,7 @@ impl Parse for VariantAttribute {
                         key_name,
                         unwrap_variant: None,
                     });
-                }else{
+                } else {
                     default = Some(DefaultValue {
                         key_name: format_ident!("value"),
                         unwrap_variant: None,

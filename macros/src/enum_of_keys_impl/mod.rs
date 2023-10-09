@@ -3,6 +3,7 @@ mod variant;
 
 use crate::enum_of_keys_impl::attrs::{EnumOfKeysAttribute, InnerAttribute};
 use crate::enum_of_keys_impl::variant::Variant;
+use crate::utils::into_enum;
 use proc_macro2::{Ident, TokenStream};
 use quote::{quote, TokenStreamExt};
 use syn::{Attribute, Path, Result};
@@ -20,32 +21,25 @@ pub fn find_and_parse_inner_attrs(attrs: &Vec<Attribute>) -> Result<Vec<InnerAtt
     Ok(result)
 }
 pub(crate) fn expand(derive_input: DeriveInput) -> Result<TokenStream> {
-    let name = derive_input.ident;
-    let enum_attributes: EnumOfKeysAttribute = derive_input
-        .attrs
+    let DeriveInput {
+        ident: name,
+        attrs,
+        data,
+        ..
+    } = derive_input;
+    let data_enum = into_enum!(data, name, "EnumOfKeys");
+    let enum_attributes: EnumOfKeysAttribute = attrs
         .iter()
         .find(|attr| attr.path().is_ident("enum_of_keys"))
         .ok_or(Error::new(name.span(), "Missing enum_of_keys attribute"))?
         .parse_args()?;
-    let mut inner_attrs = find_and_parse_inner_attrs(&derive_input.attrs)?;
-    if let Some(value) = derive_input
-        .attrs
-        .iter()
-        .find(|v| v.path().is_ident("non_exhaustive"))
-    {
+    let mut inner_attrs = find_and_parse_inner_attrs(&attrs)?;
+    if let Some(value) = attrs.iter().find(|v| v.path().is_ident("non_exhaustive")) {
         inner_attrs.push(InnerAttribute {
             meta: value.meta.clone(),
         })
     }
-    let data_enum = match derive_input.data {
-        syn::Data::Enum(data_enum) => data_enum,
-        _ => {
-            return Err(Error::new(
-                name.span(),
-                "EnumOfKeys can only be used with enums",
-            ))
-        }
-    };
+
     let mut variants = Vec::with_capacity(data_enum.variants.len());
     let mut get_key_lines = Vec::with_capacity(data_enum.variants.len());
     let mut get_key_lines_owned = Vec::with_capacity(data_enum.variants.len());
