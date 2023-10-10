@@ -13,7 +13,9 @@ pub struct Variant {
     pub inner_attrs: Vec<InnerAttribute>,
     pub default_in_cow: bool,
     pub fields_collection: TokenStream,
+    pub has_compare_str: bool,
 }
+
 impl Variant {
     pub fn new(variant: syn::Variant, default_in_cow: bool) -> Result<Self> {
         let mut attributes: Option<VariantAttribute> = variant
@@ -22,7 +24,18 @@ impl Variant {
             .find(|attr| attr.path().is_ident("enum_of_keys"))
             .map(|v| v.parse_args())
             .transpose()?;
-        let inner_attrs = find_and_parse_inner_attrs(&variant.attrs)?;
+        let mut has_compare_str = false;
+        let mut inner_attrs = find_and_parse_inner_attrs(&variant.attrs)?;
+        if let Some(value) = variant
+            .attrs
+            .iter()
+            .find(|v| v.path().is_ident("compare_str"))
+        {
+            has_compare_str = true;
+            inner_attrs.push(InnerAttribute {
+                meta: value.meta.clone(),
+            })
+        }
         if let Some(default_value) = attributes.as_mut().and_then(|v| v.default.as_mut()) {
             match &variant.fields {
                 Fields::Named(named) => {
@@ -81,6 +94,7 @@ impl Variant {
             inner_attrs,
             default_in_cow,
             fields_collection,
+            has_compare_str,
         })
     }
     pub fn has_default(&self) -> bool {

@@ -1,4 +1,5 @@
-use enum_helpers_macros::CompareToStr;
+use enum_helpers_macros::{CompareToStr, EnumOfKeys};
+use strum::EnumString;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UUIDFormat {
@@ -15,7 +16,8 @@ pub enum UUIDVersion {
     Version5,
 }
 /// Time Types
-#[derive(Debug, Clone, PartialEq, Eq, CompareToStr)]
+#[derive(Debug, Clone, PartialEq, Eq, CompareToStr, EnumOfKeys)]
+#[enum_of_keys(OtherTypesKeys, impl_common_traits, impl_strum)]
 pub enum OtherTypes {
     #[compare_str(equals["uuid::Uuid", "Uuid"], contains["uuid"])]
     UUID {

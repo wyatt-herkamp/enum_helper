@@ -49,7 +49,7 @@ use syn::{parse_macro_input, DeriveInput};
 /// Generates the following. Trait Impls Too
 ///  - [HasEnumKey](enum_of_keys_impl::HasEnumKey)
 ///  - [PartialEq] for KeyEnum and OriginalEnum
-#[proc_macro_derive(EnumOfKeys, attributes(enum_of_keys, enum_attr))]
+#[proc_macro_derive(EnumOfKeys, attributes(enum_of_keys, enum_attr, compare_str))]
 pub fn enum_of_keys(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     // Check if its an enum

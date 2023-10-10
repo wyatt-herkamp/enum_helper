@@ -43,10 +43,12 @@ pub(crate) fn expand(derive_input: DeriveInput) -> Result<TokenStream> {
     let mut variants = Vec::with_capacity(data_enum.variants.len());
     let mut get_key_lines = Vec::with_capacity(data_enum.variants.len());
     let mut get_key_lines_owned = Vec::with_capacity(data_enum.variants.len());
-
+    let mut has_compare_str = false;
     for variant in data_enum.variants {
         let variant = Variant::new(variant, enum_attributes.store_default_in_cow)?;
-
+        if variant.has_compare_str {
+            has_compare_str = true;
+        }
         get_key_lines.push(variant.create_get_key_line(&name, &enum_attributes.name));
         if enum_attributes.store_default_in_cow {
             get_key_lines_owned
@@ -83,6 +85,13 @@ pub(crate) fn expand(derive_input: DeriveInput) -> Result<TokenStream> {
         extras.push(InnerAttribute {
             meta: syn::parse_quote! {
                 derive(strum::AsRefStr, strum::EnumIs, strum::EnumString, strum::Display, strum::EnumIter)
+            },
+        })
+    }
+    if has_compare_str{
+        extras.push(InnerAttribute {
+            meta: syn::parse_quote! {
+                derive(CompareToStr)
             },
         })
     }
