@@ -3,7 +3,7 @@ use enum_helpers_macros::EnumOfKeys;
 use strum::EnumIter;
 use strum::IntoEnumIterator;
 #[derive(EnumOfKeys, EnumIter, Debug)]
-#[enum_of_keys(TestEnumKeys, impl_common_traits, serde, impl_strum)]
+#[enum_of_keys(TestEnumKeys, impl_common_traits, impl_strum)]
 #[enum_attr(strum(serialize_all = "UPPERCASE"))]
 #[non_exhaustive]
 pub enum TestEnum {

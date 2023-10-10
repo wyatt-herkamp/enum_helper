@@ -1,4 +1,3 @@
-pub(crate) mod simple_serde;
 mod compare_str;
 mod enum_of_keys_impl;
 pub(crate) mod utils;
@@ -70,24 +69,6 @@ pub fn enum_of_keys(input: TokenStream) -> TokenStream {
 pub fn compare_to_str(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     match compare_str::expand(input) {
-        Ok(ok) => ok.into(),
-        Err(err) => err.to_compile_error().into(),
-    }
-}
-/// Implements Serialize by calling Into<String> or AsRef<&str>
-#[proc_macro_derive(Serialize, attributes(serde))]
-pub fn serialize(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-    match simple_serde::expand_serialize(input) {
-        Ok(ok) => ok.into(),
-        Err(err) => err.to_compile_error().into(),
-    }
-}
-/// Implements Deserialize by calling FromStr or TryFrom<String>
-#[proc_macro_derive(Deserialize, attributes(serde))]
-pub fn deserialize(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-    match simple_serde::expand_deserialize(input) {
         Ok(ok) => ok.into(),
         Err(err) => err.to_compile_error().into(),
     }

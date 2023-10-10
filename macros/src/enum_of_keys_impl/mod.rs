@@ -59,7 +59,6 @@ pub(crate) fn expand(derive_input: DeriveInput) -> Result<TokenStream> {
         name: enum_name,
         store_default_in_cow,
         impl_common_traits,
-        serde,
         impl_strum,
     } = enum_attributes;
     let mut extras =
@@ -111,10 +110,6 @@ pub(crate) fn expand(derive_input: DeriveInput) -> Result<TokenStream> {
             enum_name.clone(),
         )
     };
-    if let Some(serde) = serde {
-        result.append_all(crate::simple_serde::expand_inner_deserialize(&serde, &enum_name));
-        result.append_all(crate::simple_serde::expand_inner_serialize(&serde, &enum_name));
-    }
 
     Ok(result)
 }
